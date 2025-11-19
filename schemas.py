@@ -1,48 +1,82 @@
 """
 Database Schemas
 
-Define your MongoDB collection schemas here using Pydantic models.
-These schemas are used for data validation in your application.
+Community Savings domain schemas using Pydantic models.
+Each class name becomes a MongoDB collection with lowercase name.
 
-Each Pydantic model represents a collection in your database.
-Model name is converted to lowercase for the collection name:
-- User -> "user" collection
-- Product -> "product" collection
-- BlogPost -> "blogs" collection
+Examples:
+- User -> "user"
+- Deposit -> "deposit"
+- Loan -> "loan"
 """
+from __future__ import annotations
+from pydantic import BaseModel, Field, EmailStr
+from typing import Optional, Literal, List
+from datetime import datetime
 
-from pydantic import BaseModel, Field
-from typing import Optional
 
-# Example schemas (replace with your own):
+class Config(BaseModel):
+    """System configuration (single document)
+    Collection: config
+    """
+    interest_base_rate: float = Field(0.10, description="Base interest per 100 RWF (10% = 0.10)")
+    interest_above_100_multiplier: float = Field(2.0, description="Multiplier for amounts > 100 RWF")
+
 
 class User(BaseModel):
+    """Users of the system (members and admins)
+    Collection: user
     """
-    Users collection schema
-    Collection name: "user" (lowercase of class name)
-    """
-    name: str = Field(..., description="Full name")
-    email: str = Field(..., description="Email address")
-    address: str = Field(..., description="Address")
-    age: Optional[int] = Field(None, ge=0, le=120, description="Age in years")
-    is_active: bool = Field(True, description="Whether user is active")
+    full_name: str
+    email: EmailStr
+    password_hash: str
+    role: Literal["member", "admin"] = "member"
+    language: Literal["en", "ar", "sw", "rw"] = "en"
+    profile_image: Optional[str] = None  # URL or path
+    is_active: bool = True
+    balance: float = 0.0
+    savings: float = 0.0
 
-class Product(BaseModel):
-    """
-    Products collection schema
-    Collection name: "product" (lowercase of class name)
-    """
-    title: str = Field(..., description="Product title")
-    description: Optional[str] = Field(None, description="Product description")
-    price: float = Field(..., ge=0, description="Price in dollars")
-    category: str = Field(..., description="Product category")
-    in_stock: bool = Field(True, description="Whether product is in stock")
 
-# Add your own schemas here:
-# --------------------------------------------------
+class Deposit(BaseModel):
+    """Deposits made by users
+    Collection: deposit
+    """
+    user_id: str
+    amount: float
+    status: Literal["pending", "accepted", "rejected"] = "pending"
+    proof_path: Optional[str] = None
 
-# Note: The Flames database viewer will automatically:
-# 1. Read these schemas from GET /schema endpoint
-# 2. Use them for document validation when creating/editing
-# 3. Handle all database operations (CRUD) directly
-# 4. You don't need to create any database endpoints!
+
+class Loan(BaseModel):
+    """Loans applied and managed
+    Collection: loan
+    """
+    user_id: str
+    amount: float
+    interest: float
+    total_payable: float
+    status: Literal["pending", "active", "rejected", "repaid"] = "pending"
+
+
+class Message(BaseModel):
+    """Chat messages
+    Collection: message
+    """
+    sender_id: str
+    sender_name: str
+    sender_avatar: Optional[str] = None
+    recipient_id: Optional[str] = None  # None means group broadcast
+    text: str
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
+
+
+class AuditLog(BaseModel):
+    """Audit trail
+    Collection: auditlog
+    """
+    actor_id: Optional[str] = None
+    action: str
+    details: Optional[str] = None
+    level: Literal["info", "warning", "security"] = "info"
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
